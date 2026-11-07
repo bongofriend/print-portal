@@ -1,0 +1,48 @@
+# Local development stack that mirrors the Kubernetes pod:
+#   portal + cups share one network namespace (like containers in a pod),
+#   fake-printer stands in for a real network printer, the scanner is simulated.
+#
+#   docker compose up --build      ->  http://localhost:8080
+#   Jobs the "printer" receives are saved in the fake-printer container:
+#     docker compose exec fake-printer ls -l /tmp/spool
+#
+# To use a real printer, delete fake-printer and set PRINTER_URI / PRINTER_MODEL
+# on the cups service (e.g. ipp://192.168.1.50/ipp/print + everywhere).
+services:
+  fake-printer:
+    image: print-portal:dev
+    build: .
+    command: ["python", "/dev-tools/fake_printer.py"]
+    environment:
+      SPOOL_DIR: /tmp/spool
+    volumes:
+      - ./dev:/dev-tools:ro
+
+  cups:
+    image: print-portal-cups:dev
+    build: ./cups
+    environment:
+      PRINTER_NAME: office
+      PRINTER_URI: socket://fake-printer:9100
+      PRINTER_MODEL: lsb/usr/cupsfilters/Generic-PDF_Printer-PDF.ppd
+      PRINTER_LOCATION: Development
+    ports:
+      - "8080:8080"   # the portal's port, published via the shared namespace
+    depends_on: [fake-printer]
+
+  portal:
+    image: print-portal:dev
+    build: .
+    network_mode: "service:cups"
+    environment:
+      PRINTER_BACKEND: cups
+      PRINTER_NAME: office
+      SCANNER_BACKEND: mock
+      # PORTAL_USER: admin
+      # PORTAL_PASSWORD: change-me
+    volumes:
+      - data:/data
+    depends_on: [cups]
+
+volumes:
+  data:

@@ -1,0 +1,7 @@
+.git
+data
+tests
+k8s
+cups
+**/__pycache__
+.pytest_cache

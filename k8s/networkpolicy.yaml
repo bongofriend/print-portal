@@ -1,0 +1,15 @@
+# Only HTTP into the pod. CUPS (631) listens on localhost only and is never exposed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: print-portal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: print-portal
+      app.kubernetes.io/component: web
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 8080
+          protocol: TCP

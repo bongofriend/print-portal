@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: print-portal
+spec:
+  # One replica: a printer queue and a scanner are single physical devices,
+  # and the data volume is ReadWriteOnce. Recreate avoids two pods on the PVC.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: print-portal
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: print-portal
+        app.kubernetes.io/component: web
+    spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      enableServiceLinks: false
+      containers:
+        # ------------------------------------------------------------------ portal
+        - name: portal
+          image: print-portal
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: print-portal-config
+          env:
+            - name: DATA_DIR
+              value: /data
+            - name: CUPS_SERVER
+              value: localhost:631
+            # Optional basic auth. Create the secret to enable it:
+            #   kubectl -n print-portal create secret generic print-portal-auth \
+            #     --from-literal=username=admin --from-literal=password='...'
+            - name: PORTAL_USER
+              valueFrom:
+                secretKeyRef: {name: print-portal-auth, key: username, optional: true}
+            - name: PORTAL_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: print-portal-auth, key: password, optional: true}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+            - {name: sane, mountPath: /etc/sane.d/dll.conf, subPath: dll.conf}
+            - {name: sane, mountPath: /etc/sane.d/airscan.conf, subPath: airscan.conf}
+            - {name: sane, mountPath: /etc/sane.d/net.conf, subPath: net.conf}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 768Mi}   # PDF rendering of large documents
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+        # ------------------------------------------------------------------ CUPS
+        # Owns the print queue; only reachable on localhost inside the pod.
+        - name: cups
+          image: print-portal-cups
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PRINTER_NAME
+              valueFrom: {configMapKeyRef: {name: print-portal-config, key: PRINTER_NAME}}
+            - name: PRINTER_URI
+              valueFrom: {configMapKeyRef: {name: print-portal-config, key: PRINTER_URI}}
+            - name: PRINTER_MODEL
+              valueFrom: {configMapKeyRef: {name: print-portal-config, key: PRINTER_MODEL, optional: true}}
+            - name: PRINTER_LOCATION
+              valueFrom: {configMapKeyRef: {name: print-portal-config, key: PRINTER_LOCATION, optional: true}}
+            - name: PRINTER_OPTIONS
+              valueFrom: {configMapKeyRef: {name: print-portal-config, key: PRINTER_OPTIONS, optional: true}}
+          volumeMounts:
+            - {name: cups-spool, mountPath: /var/spool/cups}
+          startupProbe:
+            exec: {command: ["test", "-f", "/run/cups/ready"]}
+            periodSeconds: 5
+            failureThreshold: 120   # the printer may be asleep/off when the pod starts
+          livenessProbe:
+            exec: {command: ["lpstat", "-r"]}
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 512Mi}   # filters (ghostscript) can be memory hungry
+          securityContext:
+            # cupsd starts as root and drops to the "lp" user for filters/backends.
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE", "FOWNER", "KILL"]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: print-portal-data
+        - name: tmp
+          emptyDir: {}
+        - name: cups-spool
+          emptyDir: {}
+        - name: sane
+          configMap:
+            name: print-portal-sane

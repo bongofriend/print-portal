@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: print-portal-config
+data:
+  # ---- portal -------------------------------------------------------------
+  PRINTER_BACKEND: "cups"        # "mock" to run without a printer
+  PRINTER_NAME: "office"         # CUPS queue name (shared with the sidecar)
+  SCANNER_BACKEND: "sane"        # "mock" to run without a scanner
+  SCANNER_DEVICE: ""             # e.g. "airscan:e0:Office MFP"; empty = first device found
+  SCAN_TIMEOUT_SECONDS: "300"
+  MAX_UPLOAD_MB: "50"
+  RETENTION_DAYS: "30"           # delete documents/scans older than this; 0 = keep forever
+  # ---- CUPS sidecar ---------------------------------------------------------
+  # Driverless IPP Everywhere / AirPrint printers (almost everything since ~2015):
+  PRINTER_URI: "ipp://192.168.1.50/ipp/print"
+  PRINTER_MODEL: "everywhere"
+  # Older printers: use a JetDirect URI and a generic model, e.g.
+  #   PRINTER_URI: "socket://192.168.1.50:9100"
+  #   PRINTER_MODEL: "drv:///sample.drv/generic.ppd"
+  PRINTER_LOCATION: "Office"
+  PRINTER_OPTIONS: "media=iso_a4_210x297mm"
+---
+# SANE configuration mounted into the portal container.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: print-portal-sane
+data:
+  # Only load the backends we need: keeps device discovery fast.
+  dll.conf: |
+    airscan
+    net
+  # eSCL / WSD network scanners. mDNS discovery does not cross the pod network,
+  # so list the scanner explicitly. Most MFPs serve eSCL at http://<ip>/eSCL
+  airscan.conf: |
+    [devices]
+    "Office MFP" = http://192.168.1.50/eSCL, eSCL
+    [options]
+    discovery = disable
+  # Alternatively, scanners shared by a saned host:
+  net.conf: |
+    connect_timeout = 10
+    # saned.example.internal

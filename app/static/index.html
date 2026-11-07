@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Portal</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232563eb' d='M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg>
+    Print Portal
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="dashboard" class="active">Status</button>
+    <button role="tab" data-view="documents">Documents</button>
+    <button role="tab" data-view="scan">Scan</button>
+    <button role="tab" data-view="annotate" id="annotate-tab" hidden>Annotate</button>
+  </nav>
+  <div id="printer-pill" class="pill" title="Printer status">…</div>
+</header>
+
+<main>
+  <!-- ======================= STATUS ======================= -->
+  <section id="view-dashboard" class="view active">
+    <div class="grid">
+      <div class="card">
+        <h2>Printer</h2>
+        <div id="printer-status" class="status-block"><p class="muted">Loading…</p></div>
+      </div>
+      <div class="card">
+        <h2>Supplies</h2>
+        <div id="supplies"><p class="muted">Loading…</p></div>
+      </div>
+      <div class="card">
+        <h2>Scanner</h2>
+        <div id="scanner-status" class="status-block"><p class="muted">Loading…</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Print queue</h2>
+        <button class="btn ghost small" id="refresh-jobs">Refresh</button>
+      </div>
+      <div id="jobs"></div>
+    </div>
+  </section>
+
+  <!-- ======================= DOCUMENTS ======================= -->
+  <section id="view-documents" class="view">
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" multiple accept="application/pdf,image/png,image/jpeg,image/tiff">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l5 5h-3v6h-4V8H7zM5 18h14v2H5z"/></svg>
+      <strong>Drop files here or click to upload</strong>
+      <span class="muted">PDF, PNG, JPEG or TIFF · images are converted to PDF</span>
+    </label>
+    <div id="upload-progress"></div>
+    <div class="card">
+      <h2>Documents</h2>
+      <div id="documents"></div>
+    </div>
+  </section>
+
+  <!-- ======================= SCAN ======================= -->
+  <section id="view-scan" class="view">
+    <div class="card">
+      <h2>New scan</h2>
+      <form id="scan-form" class="form-row">
+        <label>Source
+          <select name="source"><option>Flatbed</option><option>ADF</option><option>ADF Duplex</option></select>
+        </label>
+        <label>Colour
+          <select name="mode"><option value="Color">Colour</option><option value="Gray">Greyscale</option><option value="Lineart">Black &amp; white</option></select>
+        </label>
+        <label>Resolution
+          <select name="resolution"><option>75</option><option>150</option><option>200</option><option selected>300</option><option>600</option></select>
+        </label>
+        <label>Format
+          <select name="format"><option value="pdf">PDF</option><option value="png">PNG</option><option value="jpeg">JPEG</option></select>
+        </label>
+        <button class="btn primary" id="scan-btn" type="submit">Scan</button>
+      </form>
+      <p class="muted small">PNG and JPEG keep only the first page; use PDF for multi-page feeder scans.</p>
+    </div>
+    <div class="card">
+      <h2>Scans</h2>
+      <div id="scans"></div>
+    </div>
+  </section>
+
+  <!-- ======================= ANNOTATE ======================= -->
+  <section id="view-annotate" class="view">
+    <div class="toolbar" id="toolbar">
+      <div class="tool-group" role="radiogroup" aria-label="Tool">
+        <button data-tool="pen" class="tool active" title="Pen (P)">✎ Pen</button>
+        <button data-tool="highlight" class="tool" title="Highlighter (H)">▮ Highlight</button>
+        <button data-tool="rect" class="tool" title="Rectangle (R)">▭ Box</button>
+        <button data-tool="text" class="tool" title="Text (T)">T Text</button>
+        <button data-tool="whiteout" class="tool" title="White-out (W) - covers content visually; not a secure redaction">◻ White-out</button>
+        <button data-tool="eraser" class="tool" title="Eraser (E) - click an annotation to remove it">⌫ Erase</button>
+      </div>
+      <div class="tool-group">
+        <input type="color" id="ann-color" value="#d32f2f" title="Colour">
+        <select id="ann-size" title="Stroke / text size">
+          <option value="s">Small</option><option value="m" selected>Medium</option><option value="l">Large</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <button class="btn ghost small" id="undo" title="Undo (Ctrl+Z)">Undo</button>
+        <button class="btn ghost small" id="redo" title="Redo (Ctrl+Y)">Redo</button>
+        <button class="btn ghost small" id="zoom-out" title="Zoom out">−</button>
+        <span id="zoom-label" class="muted small">100%</span>
+        <button class="btn ghost small" id="zoom-in" title="Zoom in">+</button>
+      </div>
+      <div class="tool-group right">
+        <span id="save-state" class="muted small"></span>
+        <button class="btn" id="ann-save">Save</button>
+        <button class="btn" id="ann-download">Download</button>
+        <button class="btn primary" id="ann-print">Print…</button>
+      </div>
+    </div>
+    <h2 id="ann-title" class="ann-title"></h2>
+    <div id="pages" class="pages"></div>
+  </section>
+</main>
+
+<!-- Print dialog -->
+<dialog id="print-dialog">
+  <form method="dialog" id="print-form">
+    <h2>Print <span id="print-doc-name"></span></h2>
+    <div class="form-grid">
+      <label>Copies <input type="number" name="copies" min="1" max="99" value="1"></label>
+      <label>Pages <input type="text" name="page_ranges" placeholder="All (e.g. 1-3,5)" pattern="^\s*\d+(\s*-\s*\d+)?(\s*,\s*\d+(\s*-\s*\d+)?)*\s*$"></label>
+      <label>Sides
+        <select name="sides">
+          <option value="one-sided">One-sided</option>
+          <option value="two-sided-long-edge">Two-sided (long edge)</option>
+          <option value="two-sided-short-edge">Two-sided (short edge)</option>
+        </select>
+      </label>
+      <label>Colour
+        <select name="color"><option value="color">Colour</option><option value="monochrome">Black &amp; white</option></select>
+      </label>
+      <label>Paper
+        <select name="media"><option value="">Printer default</option><option>A4</option><option>A3</option><option>A5</option><option>Letter</option><option>Legal</option></select>
+      </label>
+      <label>Orientation
+        <select name="orientation"><option value="">Auto</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+      </label>
+    </div>
+    <label class="check"><input type="checkbox" name="fit_to_page" checked> Fit to page</label>
+    <label class="check" id="print-ann-row"><input type="checkbox" name="include_annotations" checked> Include annotations</label>
+    <p id="print-error" class="error"></p>
+    <div class="dialog-actions">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="print" id="print-submit">Print</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: print-portal
+  annotations:
+    # Uploads up to MAX_UPLOAD_MB; keep these in sync (ingress-nginx shown).
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    # cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  # ingressClassName: nginx
+  rules:
+    - host: print.example.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: print-portal
+                port:
+                  name: http
+  # tls:
+  #   - hosts: [print.example.internal]
+  #     secretName: print-portal-tls

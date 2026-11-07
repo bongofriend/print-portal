@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: print-portal
+labels:
+  - pairs:
+      app.kubernetes.io/name: print-portal
+      app.kubernetes.io/part-of: print-portal
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+# Point these at your registry after building and pushing the images:
+images:
+  - name: print-portal
+    newName: ghcr.io/your-org/print-portal
+    newTag: "1.0.0"
+  - name: print-portal-cups
+    newName: ghcr.io/your-org/print-portal-cups
+    newTag: "1.0.0"

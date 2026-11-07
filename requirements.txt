@@ -1,0 +1,7 @@
+fastapi==0.162.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+pypdf==6.17.0
+pypdfium2==5.13.0
+pillow==12.3.0
+reportlab==5.0.1
